@@ -1,1 +1,1 @@
-in this page all fontend details , 
+in this page all frontend details remains , 
