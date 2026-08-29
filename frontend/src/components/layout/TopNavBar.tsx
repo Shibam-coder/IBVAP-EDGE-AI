@@ -15,20 +15,22 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
 
   const navLinks = [
     { name: 'SURVEILLANCE', href: '/' },
+    { name: 'TACTICAL GRID', href: '/grid' },
+    { name: 'COMMAND FOCUS', href: '/focus' },
     { name: 'RISK ANALYTICS', href: '/analytics' },
     { name: 'GIS MAP', href: '/gis' },
   ];
 
   return (
     <header className="bg-[#111318] text-[#a4e6ff] border-b border-[#3c494e] flex justify-between items-center w-full px-6 top-0 h-16 shrink-0 z-50">
-      <div className="flex items-center gap-8">
+      <div className="flex items-center gap-6 lg:gap-8">
         <Link
           href="/"
           className="font-sans text-xl font-bold text-[#a4e6ff] tracking-tighter uppercase hover:text-[#00d1ff] transition-colors"
         >
           IBVAP-EDGE AI
         </Link>
-        <nav className="hidden md:flex gap-6 items-center h-16">
+        <nav className="hidden md:flex gap-4 lg:gap-6 items-center h-16">
           {navLinks.map((link) => {
             const isActive =
               pathname === link.href ||
@@ -59,7 +61,7 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
           <input
             type="text"
             placeholder="Search parameters..."
-            className="bg-[#05070a] border border-[#3c494e] rounded px-9 py-1 font-mono text-xs text-[#e2e2e8] placeholder:text-[#859399] focus:border-[#a4e6ff] focus:ring-1 focus:ring-[#a4e6ff] outline-none w-56 transition-all"
+            className="bg-[#05070a] border border-[#3c494e] rounded px-9 py-1 font-mono text-xs text-[#e2e2e8] placeholder:text-[#859399] focus:border-[#a4e6ff] focus:ring-1 focus:ring-[#a4e6ff] outline-none w-48 lg:w-56 transition-all"
           />
         </div>
 

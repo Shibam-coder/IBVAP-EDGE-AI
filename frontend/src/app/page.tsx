@@ -2,9 +2,11 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { TacticalShell } from '@/components/layout/TacticalShell';
 
 export default function SurveillanceInitializationPage() {
+  const router = useRouter();
   const [selectedCam, setSelectedCam] = useState<'CAM-01' | 'CAM-02' | 'CAM-03'>('CAM-02');
   const [deHaze, setDeHaze] = useState<boolean>(true);
   const [clahe, setClahe] = useState<boolean>(false);
@@ -58,7 +60,10 @@ export default function SurveillanceInitializationPage() {
           </div>
 
           {/* Drop Zone */}
-          <div className="hud-panel ghost-border rounded-lg relative p-8 flex flex-col items-center justify-center min-h-[280px] border-dashed border-2 border-[#3c494e] hover:border-[#a4e6ff] transition-colors cursor-pointer group select-none">
+          <div
+            onClick={() => router.push('/grid')}
+            className="hud-panel ghost-border rounded-lg relative p-8 flex flex-col items-center justify-center min-h-[280px] border-dashed border-2 border-[#3c494e] hover:border-[#a4e6ff] transition-colors cursor-pointer group select-none"
+          >
             {/* Corner brackets for HUD feel */}
             <div className="absolute top-2 left-2 w-4 h-4 border-t-2 border-l-2 border-[#3c494e]" />
             <div className="absolute top-2 right-2 w-4 h-4 border-t-2 border-r-2 border-[#3c494e]" />
@@ -73,7 +78,7 @@ export default function SurveillanceInitializationPage() {
             </h2>
             <p className="font-mono text-xs text-[#a4e6ff] uppercase mb-6">
               <span className="text-[#859399]">DROP</span> VIDEO{' '}
-              <span className="text-[#859399]">HERE</span>
+              <span className="text-[#859399]">HERE OR CLICK TO LAUNCH TACTICAL GRID</span>
             </p>
 
             <div className="flex gap-4">
@@ -92,12 +97,22 @@ export default function SurveillanceInitializationPage() {
               <h3 className="font-mono text-[11px] text-[#859399] uppercase tracking-wider font-bold">
                 SIMULATION FEEDS (PRE-LOADED)
               </h3>
-              <button
-                onClick={() => setSelectedCam('CAM-02')}
-                className="font-mono text-[11px] text-[#a4e6ff] hover:text-[#00d1ff] uppercase flex items-center gap-1 cursor-pointer"
-              >
-                REFRESH LIST
-              </button>
+              <div className="flex items-center gap-3">
+                <Link
+                  href="/grid"
+                  className="font-mono text-[11px] text-[#00d1ff] hover:underline uppercase flex items-center gap-1"
+                >
+                  <span className="material-symbols-outlined text-xs">grid_view</span>
+                  VIEW TACTICAL GRID (SCREEN 2)
+                </Link>
+                <Link
+                  href="/focus"
+                  className="font-mono text-[11px] text-[#ffb4ab] hover:underline uppercase flex items-center gap-1"
+                >
+                  <span className="material-symbols-outlined text-xs">center_focus_strong</span>
+                  VIEW COMMAND FOCUS (SCREEN 3)
+                </Link>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -324,7 +339,7 @@ export default function SurveillanceInitializationPage() {
             {/* Launch Action Button */}
             <div className="mt-auto p-4 border-t border-[#3c494e]">
               <Link
-                href="/analytics"
+                href="/grid"
                 className="w-full bg-[#a4e6ff] hover:bg-[#00d1ff] text-black font-mono font-bold text-xs py-3 px-4 rounded flex items-center justify-center gap-2 transition-all active:scale-95 text-center shadow-[0_0_12px_rgba(0,209,255,0.3)]"
               >
                 <span className="material-symbols-outlined text-base">play_arrow</span>
