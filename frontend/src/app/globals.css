@@ -1,26 +1,159 @@
+@import url("https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap");
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
+@layer base {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #05070a;
+    --foreground: #e2e2e8;
+    --surface: #111318;
+    --surface-container-lowest: #0c0e12;
+    --surface-container-low: #0f131a;
+    --surface-container: #1e2024;
+    --surface-container-high: #282a2e;
+    --surface-container-highest: #333539;
+    --surface-bright: #37393e;
+    --surface-variant: #333539;
+    --primary: #a4e6ff;
+    --primary-container: #00d1ff;
+    --primary-fixed-dim: #4cd6ff;
+    --on-primary: #003543;
+    --on-surface: #e2e2e8;
+    --on-surface-variant: #bbc9cf;
+    --outline: #859399;
+    --outline-variant: #3c494e;
+    --error: #ffb4ab;
+    --error-container: #93000a;
+    --on-error: #690005;
+    --secondary: #ffdb9d;
+    --secondary-container: #feb700;
+    --tertiary: #ffd1ce;
+    --tertiary-container: #ffaaa4;
   }
 }
 
+@theme {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-container-lowest: var(--surface-container-lowest);
+  --color-surface-container-low: var(--surface-container-low);
+  --color-surface-container: var(--surface-container);
+  --color-surface-container-high: var(--surface-container-high);
+  --color-surface-container-highest: var(--surface-container-highest);
+  --color-surface-bright: var(--surface-bright);
+  --color-surface-variant: var(--surface-variant);
+  --color-primary: var(--primary);
+  --color-primary-container: var(--primary-container);
+  --color-primary-fixed-dim: var(--primary-fixed-dim);
+  --color-on-primary: var(--on-primary);
+  --color-on-surface: var(--on-surface);
+  --color-on-surface-variant: var(--on-surface-variant);
+  --color-outline: var(--outline);
+  --color-outline-variant: var(--outline-variant);
+  --color-error: var(--error);
+  --color-error-container: var(--error-container);
+  --color-on-error: var(--on-error);
+  --color-secondary: var(--secondary);
+  --color-secondary-container: var(--secondary-container);
+  --color-tertiary: var(--tertiary);
+  --color-tertiary-container: var(--tertiary-container);
+
+  --font-sans: 'Hanken Grotesk', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: #05070a;
+  color: #e2e2e8;
+  font-family: var(--font-sans);
+  overflow-x: hidden;
+}
+
+/* Tactical HUD Custom Utilities */
+.ghost-border {
+  border: 1px solid #2d3540;
+}
+
+.hud-panel {
+  background-color: #0f131a;
+}
+
+.glow-active {
+  box-shadow: 0 0 12px rgba(76, 214, 255, 0.45);
+}
+
+.glow-alert {
+  box-shadow: 0 0 16px rgba(255, 180, 171, 0.4);
+}
+
+.scanline {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0),
+    rgba(255, 255, 255, 0) 50%,
+    rgba(0, 0, 0, 0.15) 50%,
+    rgba(0, 0, 0, 0.15)
+  );
+  background-size: 100% 4px;
+  pointer-events: none;
+  z-index: 10;
+  opacity: 0.35;
+}
+
+.pulse-dot {
+  animation: pulse-dot-anim 2s infinite;
+}
+
+@keyframes pulse-dot-anim {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(255, 180, 171, 0.7);
+  }
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 8px rgba(255, 180, 171, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(255, 180, 171, 0);
+  }
+}
+
+.grid-pattern {
+  background-image: 
+    linear-gradient(rgba(45, 53, 64, 0.3) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(45, 53, 64, 0.3) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+.scan-line {
+  background: linear-gradient(to bottom, transparent 0%, rgba(0, 209, 255, 0.1) 50%, transparent 100%);
+  animation: scan 4s linear infinite;
+}
+
+@keyframes scan {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100vh); }
+}
+
+/* Tactical HUD Scrollbars */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: #05070a;
+}
+::-webkit-scrollbar-thumb {
+  background: #3c494e;
+  border-radius: 2px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #00d1ff;
 }
