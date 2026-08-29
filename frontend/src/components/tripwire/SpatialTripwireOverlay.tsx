@@ -1,7 +1,24 @@
 'use client';
 
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { TripwireZone, Point2D, TripwireDirection, SeverityLevel } from '@/types';
+
+/**
+ * Structured Tripwire Breach Event contract.
+ * Exposes clean, typed parameters ready for downstream XAI and Threat Score engines.
+ */
+export interface TripwireBreachEvent {
+  tripwire_id: string;
+  tripwire_name?: string;
+  camera_id: string;
+  timestamp: string;
+  object_type: string;
+  confidence: number;
+  crossing_direction: 'INBOUND' | 'OUTBOUND';
+  tripwire_breached: boolean;
+  coordinates?: Point2D[];
+  snapshot_url?: string;
+}
 
 export interface SpatialTripwireOverlayProps {
   /** List of tripwires to display */
@@ -14,10 +31,14 @@ export interface SpatialTripwireOverlayProps {
   onTripwireCreated?: (newTripwire: Omit<TripwireZone, 'id'>) => void;
   /** Callback when a tripwire is clicked */
   onTripwireSelect?: (tripwireId: string) => void;
+  /** Callback when a tripwire breach event occurs */
+  onTripwireBreach?: (event: TripwireBreachEvent) => void;
   /** Optional custom drawing direction */
   drawDirection?: TripwireDirection;
   /** Optional custom drawing severity */
   drawSeverity?: SeverityLevel;
+  /** Camera ID associated with the current viewport */
+  cameraId?: string;
   /** Optional container class name */
   className?: string;
   /** Whether to show breach pulse animation */
@@ -30,14 +51,36 @@ export const SpatialTripwireOverlay: React.FC<SpatialTripwireOverlayProps> = ({
   selectedTripwireId = null,
   onTripwireCreated,
   onTripwireSelect,
+  onTripwireBreach,
   drawDirection = 'INBOUND',
   drawSeverity = 'CRITICAL',
+  cameraId = 'CAM-01',
   className = '',
   hasActiveBreach = true,
 }) => {
   const svgRef = useRef<SVGSVGElement | null>(null);
   const [drawingPoints, setDrawingPoints] = useState<Point2D[]>([]);
   const [currentMousePos, setCurrentMousePos] = useState<Point2D | null>(null);
+
+  // Trigger onTripwireBreach event when breach is active
+  useEffect(() => {
+    if (hasActiveBreach && onTripwireBreach && tripwires.length > 0) {
+      const activeTw = tripwires.find((tw) => tw.severity === 'CRITICAL' && tw.isActive) || tripwires[0];
+      if (activeTw) {
+        onTripwireBreach({
+          tripwire_id: activeTw.id,
+          tripwire_name: activeTw.name,
+          camera_id: cameraId,
+          timestamp: new Date().toLocaleTimeString('en-US', { hour12: false }),
+          object_type: 'person',
+          confidence: 0.97,
+          crossing_direction: activeTw.direction === 'OUTBOUND' ? 'OUTBOUND' : 'INBOUND',
+          tripwire_breached: true,
+          coordinates: activeTw.points,
+        });
+      }
+    }
+  }, [hasActiveBreach, onTripwireBreach, tripwires, cameraId]);
 
   // Helper to convert mouse event to normalized 0..1 coordinates
   const getNormalizedCoordinates = useCallback((e: React.MouseEvent<SVGSVGElement>): Point2D => {
@@ -63,7 +106,7 @@ export const SpatialTripwireOverlay: React.FC<SpatialTripwireOverlayProps> = ({
 
       if (onTripwireCreated) {
         onTripwireCreated({
-          cameraId: 'CAM-01',
+          cameraId: cameraId,
           name: `Tripwire Zone ${tripwires.length + 1}`,
           points: fullPoints,
           direction: drawDirection,
@@ -95,7 +138,7 @@ export const SpatialTripwireOverlay: React.FC<SpatialTripwireOverlayProps> = ({
   };
 
   return (
-    <div className={`absolute inset-0 pointer-events-none ${className}`}>
+    <div className={`absolute inset-0 pointer-events-none select-none ${className}`}>
       <svg
         ref={svgRef}
         className={`w-full h-full ${isDrawing ? 'pointer-events-auto cursor-crosshair' : 'pointer-events-auto'}`}
@@ -105,7 +148,7 @@ export const SpatialTripwireOverlay: React.FC<SpatialTripwireOverlayProps> = ({
         onMouseMove={handleMouseMove}
       >
         <defs>
-          {/* Glowing filter for tactical laser/tripwire effect */}
+          {/* Glowing laser tactical filters */}
           <filter id="laser-glow-red" x="-20%" y="-20%" width="140%" height="140%">
             <feGaussianBlur stdDeviation="4" result="blur" />
             <feMerge>
@@ -124,7 +167,7 @@ export const SpatialTripwireOverlay: React.FC<SpatialTripwireOverlayProps> = ({
 
         {/* Existing Tripwire Lines */}
         {tripwires.map((tw) => {
-          if (!tw.points || tw.points.length < 2) return null;
+          if (!tw.points || tw.points.length < 2 || tw.isActive === false) return null;
           const p1 = tw.points[0];
           const p2 = tw.points[1];
           const x1 = p1.x * 1000;
@@ -135,9 +178,9 @@ export const SpatialTripwireOverlay: React.FC<SpatialTripwireOverlayProps> = ({
           const midY = (y1 + y2) / 2;
           const isSelected = selectedTripwireId === tw.id;
           const isBreached = hasActiveBreach && tw.severity === 'CRITICAL';
-          const strokeColor = getColorBySeverity(tw.severity, tw.color);
+          const strokeColor = isBreached ? '#ff2d55' : getColorBySeverity(tw.severity, tw.color);
 
-          // Normal angle for directional indicator
+          // Normal angle for directional indicator chevrons
           const angle = Math.atan2(y2 - y1, x2 - x1);
           const normalAngle = angle + Math.PI / 2;
           const arrowLen = 25;
@@ -150,77 +193,80 @@ export const SpatialTripwireOverlay: React.FC<SpatialTripwireOverlayProps> = ({
               className="cursor-pointer transition-opacity hover:opacity-100"
               onClick={() => onTripwireSelect?.(tw.id)}
             >
-              {/* Outer Glow Halo */}
+              {/* Outer Pulsating Glow Halo during Breach */}
               <line
                 x1={x1}
                 y1={y1}
                 x2={x2}
                 y2={y2}
                 stroke={strokeColor}
-                strokeWidth={isBreached ? 8 : 4}
-                strokeOpacity={isBreached ? 0.4 : 0.2}
-                strokeDasharray={isBreached ? '12 6' : undefined}
+                strokeWidth={isBreached ? 10 : 4}
+                strokeOpacity={isBreached ? 0.45 : 0.2}
+                strokeDasharray={isBreached ? '16 8' : undefined}
                 className={isBreached ? 'animate-pulse' : ''}
               />
 
-              {/* Main Tripwire Line */}
+              {/* Main Tripwire Laser Line */}
               <line
                 x1={x1}
                 y1={y1}
                 x2={x2}
                 y2={y2}
                 stroke={strokeColor}
-                strokeWidth={isSelected ? 3 : 2}
+                strokeWidth={isSelected ? 3.5 : 2}
                 strokeDasharray={tw.direction === 'BIDIRECTIONAL' ? '8 4' : '16 4 4 4'}
                 filter={strokeColor === '#ff2d55' ? 'url(#laser-glow-red)' : 'url(#laser-glow-cyan)'}
               />
 
-              {/* Start Point Node */}
-              <circle cx={x1} cy={y1} r={isSelected ? 6 : 4} fill={strokeColor} />
-              <circle cx={x1} cy={y1} r={8} stroke={strokeColor} strokeWidth={1} fill="none" opacity={0.6} />
+              {/* Start Point Terminal Node */}
+              <circle cx={x1} cy={y1} r={isSelected ? 6 : 4.5} fill={strokeColor} />
+              <circle cx={x1} cy={y1} r={9} stroke={strokeColor} strokeWidth={1} fill="none" opacity={0.6} />
 
-              {/* End Point Node */}
-              <circle cx={x2} cy={y2} r={isSelected ? 6 : 4} fill={strokeColor} />
-              <circle cx={x2} cy={y2} r={8} stroke={strokeColor} strokeWidth={1} fill="none" opacity={0.6} />
+              {/* End Point Terminal Node */}
+              <circle cx={x2} cy={y2} r={isSelected ? 6 : 4.5} fill={strokeColor} />
+              <circle cx={x2} cy={y2} r={9} stroke={strokeColor} strokeWidth={1} fill="none" opacity={0.6} />
 
               {/* Direction Indicator Chevrons */}
               {tw.direction !== 'BIDIRECTIONAL' && (
-                <line
-                  x1={midX}
-                  y1={midY}
-                  x2={arrowX}
-                  y2={arrowY}
-                  stroke={strokeColor}
-                  strokeWidth={2}
-                  strokeDasharray="4 2"
-                />
+                <g opacity={0.85}>
+                  <line
+                    x1={midX}
+                    y1={midY}
+                    x2={arrowX}
+                    y2={arrowY}
+                    stroke={strokeColor}
+                    strokeWidth={2}
+                    strokeDasharray="4 2"
+                  />
+                  <circle cx={arrowX} cy={arrowY} r={3} fill={strokeColor} />
+                </g>
               )}
 
-              {/* Label & Severity Badge overlay */}
+              {/* Label & Severity Badge HUD overlay */}
               <foreignObject
-                x={Math.max(10, Math.min(820, midX - 90))}
+                x={Math.max(10, Math.min(800, midX - 95))}
                 y={Math.max(10, Math.min(940, midY - 28))}
-                width="200"
-                height="32"
+                width="220"
+                height="36"
                 className="overflow-visible pointer-events-none"
               >
-                <div className="flex items-center gap-1 bg-[#111318]/90 border border-[#3c494e] px-2 py-0.5 rounded shadow-lg backdrop-blur-md w-max">
+                <div className="flex items-center gap-1.5 bg-[#111318]/95 border border-[#3c494e] px-2 py-0.5 rounded shadow-xl backdrop-blur-md w-max">
                   <span
-                    className="w-1.5 h-1.5 rounded-full"
+                    className={`w-2 h-2 rounded-full ${isBreached ? 'animate-ping' : ''}`}
                     style={{ backgroundColor: strokeColor }}
                   />
                   <span className="font-mono text-[9px] font-bold uppercase tracking-wider text-[#e2e2e8]">
                     {tw.name}
                   </span>
                   <span
-                    className="font-mono text-[8px] font-bold px-1 rounded uppercase ml-1"
+                    className="font-mono text-[8px] font-bold px-1 rounded uppercase"
                     style={{
                       backgroundColor: `${strokeColor}25`,
                       color: strokeColor,
                       border: `1px solid ${strokeColor}60`,
                     }}
                   >
-                    {tw.direction}
+                    {isBreached ? 'BREACH' : tw.direction}
                   </span>
                 </div>
               </foreignObject>
@@ -237,7 +283,7 @@ export const SpatialTripwireOverlay: React.FC<SpatialTripwireOverlayProps> = ({
               x2={currentMousePos.x * 1000}
               y2={currentMousePos.y * 1000}
               stroke="#00d1ff"
-              strokeWidth={2}
+              strokeWidth={2.5}
               strokeDasharray="6 4"
               className="animate-pulse"
             />
@@ -260,13 +306,13 @@ export const SpatialTripwireOverlay: React.FC<SpatialTripwireOverlayProps> = ({
         )}
       </svg>
 
-      {/* Drawing mode tactical HUD helper banner */}
+      {/* Drawing mode tactical helper HUD */}
       {isDrawing && (
         <div className="absolute top-2 left-1/2 -translate-x-1/2 bg-[#111318]/95 border border-[#00d1ff] text-[#00d1ff] px-4 py-1.5 rounded shadow-xl backdrop-blur-md flex items-center gap-2 font-mono text-xs z-30 pointer-events-none animate-pulse">
           <span className="w-2 h-2 rounded-full bg-[#00d1ff]" />
           <span>
             {drawingPoints.length === 0
-              ? 'CLICK TO PLACE START POINT OF VIRTUAL TRIPWIRE'
+              ? 'CLICK ON VIDEO TO PLACE START POINT OF VIRTUAL TRIPWIRE'
               : 'CLICK TO COMPLETE TRIPWIRE BOUNDARY'}
           </span>
         </div>

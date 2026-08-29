@@ -3,7 +3,7 @@
 import React from 'react';
 import { CameraFeed, TripwireZone } from '@/types';
 import { DetectionOverlay, DetectionItem } from './DetectionOverlay';
-import { SpatialTripwireOverlay } from '../tripwire/SpatialTripwireOverlay';
+import { SpatialTripwireOverlay, TripwireBreachEvent } from '../tripwire/SpatialTripwireOverlay';
 
 export interface VisionFiltersState {
   deHaze?: boolean;
@@ -18,6 +18,7 @@ export interface VideoViewportProps {
   isDrawingTripwire?: boolean;
   onTripwireCreated?: (newTripwire: Omit<TripwireZone, 'id'>) => void;
   onTripwireSelect?: (id: string) => void;
+  onTripwireBreach?: (event: TripwireBreachEvent) => void;
   selectedTripwireId?: string | null;
   filters?: VisionFiltersState;
   showCrosshair?: boolean;
@@ -27,6 +28,20 @@ export interface VideoViewportProps {
   hasActiveBreach?: boolean;
 }
 
+// Exact image URLs from Google Stitch project for realistic tactical HUD feeds
+const STITCH_FEED_IMAGE_URLS: Record<string, string> = {
+  'CAM-01':
+    'https://lh3.googleusercontent.com/aida-public/AB6AXuDyLHr-USadpDIe9n-y9BEhWbgYt6IAmDlFhxVTvrJNjrppyCaJFJJNG4GoXeUY41ULZvJwAEBsDQ0D0H65JDp7u6H6rPikbzUulqzPRjEXT7wX2rXM2r2o-_5rf-dlm_Zy4bnF-UfySkmFsRjnuq-R-74bin_YyFtcQwAuRozdHeOvLkJPZsVUbux5644wmeR2y9WJojZ4XONXwqKDM-b8xt8NpkMdiuzsIVFR40ADPfUd0Ow1MKPwIuryTgXg3MQAQjk',
+  'CAM-02':
+    'https://lh3.googleusercontent.com/aida-public/AB6AXuBn47KBCV0T05HFf4VY3maPoIZN2a2LPAg5-UfrKXcAZuV48V7X-Qk6Z5zCqNWAJcnNprctVMZ49YI15n-dq4VNKgqAJHSXr1C_tuwj8zAF7UwFuRbyJWW8z5_wqEq7ZqePRvmLP1kQNzSxWfeCKfv78di7plg6YUAeMdBEsndM_5EsfdmZ7UmJuzfHMAWFfFKn6LkIcQ1IVbroxPfmnQq4Gva6jfOE7PDSx2XbbBHAdd4Pq_60zREHSA',
+  'CAM-03':
+    'https://lh3.googleusercontent.com/aida-public/AB6AXuD2LJthJXSNLUIXbSyaUkBkT9vemWfA27MbmGoQPugKcDVy6xZIe1arNuhqVl6rIMv7ICIkycRKtk8rECRjefN6e6YooPSPUcLHe7ptALY-Tb2CVw_5brfrpqQDEZqvfvXgpOubt7eLLMhT1mseI7uxEcE0wGl6G_p4t7InP01MOpA4U3PylqfHqg2rnzqO2vdJccEKuRLyes3QovCaupg4yrN0vBaYOtYk3vFpp71hNm_NtRS6D9Qxlw',
+  'CAM-04':
+    'https://lh3.googleusercontent.com/aida-public/AB6AXuAufdbCEd2ormLC4IgZ9H1ChS5BziZfQJn8KpfSGtdH-112lmS_ARi8P-Hoyy461lGhe5-EGswmkSTFcW-eB6hwsEFsJaplaBP-65324Jfj-9g_5_VjHnpvf0S962cHpoIe4GRXfq0uPhf32bWR8r63bgTDH8S-h4pAyFc_LLO2LG-vxsWZTya7aCcWgfzHumSeOG8fqufWTxKMUhZod-ACfdysJGa1e7AjTFuh_puvgQndY9ywTaYMvw',
+  'COMMAND-STAGE':
+    'https://lh3.googleusercontent.com/aida-public/AB6AXuDO2OfmTwjGHhuU0t-nxeIrQtcYmB0SoKtuhqBpFSEIf8HgwX0P5DbTblDAUxQft3tqeEjs3kd9cZ54AXS1YHPu9AfI0aRu3TIwOYQrmMAnxP3B5QSLSz1D2dIEmdsvRa-a0y-QBwOH3KAcARgGcPXUnSCoys09d3z1290R5M4c2jN29c4WfXvSQYWyxy8vLN-QnHRvzPR3OPLpFk4U0V770ZzjM8bA62SPdDhgMFRq50oHDRyj80KGeQ',
+};
+
 export const VideoViewport: React.FC<VideoViewportProps> = ({
   camera,
   detections = [],
@@ -34,6 +49,7 @@ export const VideoViewport: React.FC<VideoViewportProps> = ({
   isDrawingTripwire = false,
   onTripwireCreated,
   onTripwireSelect,
+  onTripwireBreach,
   selectedTripwireId,
   filters = {},
   showCrosshair,
@@ -63,8 +79,8 @@ export const VideoViewport: React.FC<VideoViewportProps> = ({
     };
   };
 
-  // High-fidelity SVG/Canvas background generator for realistic tactical mock feeds
-  const renderSimulatedFeed = () => {
+  // High-fidelity background rendering matching Stitch
+  const renderFeedContent = () => {
     if (isOffline) {
       return (
         <div className="absolute inset-0 bg-[#0c0e12] flex flex-col items-center justify-center text-[#859399]">
@@ -81,101 +97,34 @@ export const VideoViewport: React.FC<VideoViewportProps> = ({
       );
     }
 
-    switch (camera.type) {
-      case 'THERMAL':
-        return (
-          <div
-            className="absolute inset-0 w-full h-full bg-[#080d14]"
-            style={{
-              backgroundImage: `radial-gradient(ellipse at 60% 60%, rgba(0, 209, 255, 0.15) 0%, rgba(10, 15, 25, 0.95) 70%), linear-gradient(135deg, #050b14 0%, #101c2a 100%)`,
-              ...getFilterStyle(),
-            }}
-          >
-            {/* Thermal Background Terrain Contours */}
-            <svg className="absolute inset-0 w-full h-full opacity-40" preserveAspectRatio="none" viewBox="0 0 800 500">
-              <path d="M0,350 Q200,300 400,340 T800,310 L800,500 L0,500 Z" fill="#0d1f30" />
-              <path d="M0,390 Q300,340 550,380 T800,360 L800,500 L0,500 Z" fill="#132a40" />
-              <line x1="50" y1="280" x2="750" y2="280" stroke="#00d1ff" strokeWidth="0.5" strokeDasharray="4 8" opacity="0.3" />
-              <line x1="50" y1="360" x2="750" y2="360" stroke="#00d1ff" strokeWidth="0.5" strokeDasharray="4 8" opacity="0.3" />
-              {/* Thermal Hotspot heat signature */}
-              <circle cx="580" cy="290" r="35" fill="url(#thermalHeatGlow)" opacity="0.75" className="animate-pulse" />
-              <defs>
-                <radialGradient id="thermalHeatGlow" cx="50%" cy="50%" r="50%">
-                  <stop offset="0%" stopColor="#ffffff" stopOpacity="0.9" />
-                  <stop offset="40%" stopColor="#ffb4ab" stopOpacity="0.7" />
-                  <stop offset="70%" stopColor="#00d1ff" stopOpacity="0.4" />
-                  <stop offset="100%" stopColor="#001f28" stopOpacity="0" />
-                </radialGradient>
-              </defs>
-            </svg>
-          </div>
-        );
+    const imageUrl = STITCH_FEED_IMAGE_URLS[camera.id] || STITCH_FEED_IMAGE_URLS['COMMAND-STAGE'];
 
-      case 'FIXED_OPTICAL':
-        return (
-          <div
-            className="absolute inset-0 w-full h-full bg-[#0e1116] grayscale opacity-85"
-            style={{
-              backgroundImage: `linear-gradient(180deg, #13171e 0%, #0a0d12 100%)`,
-              ...getFilterStyle(),
-            }}
-          >
-            {/* Checkpost road / gate outlines */}
-            <svg className="absolute inset-0 w-full h-full opacity-35" preserveAspectRatio="none" viewBox="0 0 800 500">
-              <polygon points="320,180 480,180 700,500 100,500" fill="#1b212b" />
-              <line x1="400" y1="180" x2="400" y2="500" stroke="#feb700" strokeWidth="2" strokeDasharray="20 15" opacity="0.5" />
-              <rect x="280" y="240" width="240" height="140" fill="#252d3a" rx="8" opacity="0.8" />
-            </svg>
-          </div>
-        );
+    return (
+      <div className="absolute inset-0 w-full h-full overflow-hidden" style={getFilterStyle()}>
+        {/* Background Image Layer from Stitch with Tactical Opacity */}
+        <div
+          className={`absolute inset-0 w-full h-full bg-cover bg-center transition-all ${
+            camera.type === 'FIXED_OPTICAL' || camera.type === 'UAV_FEED' ? 'grayscale opacity-75' : 'opacity-80'
+          }`}
+          style={{
+            backgroundImage: `url('${imageUrl}')`,
+          }}
+        />
 
-      case 'NIGHT_VISION':
-      case 'PTZ':
-        return (
-          <div
-            className="absolute inset-0 w-full h-full bg-[#05110d]"
-            style={{
-              backgroundImage: `radial-gradient(circle at 50% 50%, rgba(16, 64, 40, 0.4) 0%, rgba(2, 10, 6, 0.95) 80%)`,
-              ...getFilterStyle(),
-            }}
-          >
-            {/* Riverine landscape contours */}
-            <svg className="absolute inset-0 w-full h-full opacity-30" preserveAspectRatio="none" viewBox="0 0 800 500">
-              <path d="M0,260 C250,230 400,320 800,240 L800,500 L0,500 Z" fill="#0d281a" />
-              <path d="M0,320 C300,280 500,370 800,310 L800,500 L0,500 Z" fill="#081a11" />
-            </svg>
-          </div>
-        );
-
-      case 'UAV_FEED':
-        return (
-          <div
-            className="absolute inset-0 w-full h-full bg-[#0a0f18] grayscale opacity-85"
-            style={{
-              backgroundImage: `radial-gradient(circle at 50% 40%, rgba(25, 45, 70, 0.5) 0%, #060910 85%)`,
-              ...getFilterStyle(),
-            }}
-          >
-            {/* Aerial topographical terrain lines */}
-            <svg className="absolute inset-0 w-full h-full opacity-25" preserveAspectRatio="none" viewBox="0 0 800 500">
-              <ellipse cx="400" cy="250" rx="300" ry="180" fill="none" stroke="#00d1ff" strokeWidth="1" strokeDasharray="6 6" />
-              <ellipse cx="400" cy="250" rx="200" ry="120" fill="none" stroke="#00d1ff" strokeWidth="0.8" strokeDasharray="4 4" />
-              <ellipse cx="400" cy="250" rx="100" ry="60" fill="none" stroke="#00d1ff" strokeWidth="0.5" />
-            </svg>
-          </div>
-        );
-
-      default:
-        return <div className="absolute inset-0 bg-[#0c0e12]" />;
-    }
+        {/* Fallback & Enhanced Contours */}
+        {camera.type === 'THERMAL' && (
+          <div className="absolute inset-0 bg-radial from-transparent via-[#050b14]/40 to-[#050b14]/90 pointer-events-none" />
+        )}
+      </div>
+    );
   };
 
   return (
     <div
       className={`relative w-full h-full bg-[#05070A] overflow-hidden select-none ${className}`}
     >
-      {/* Video Content Canvas / Stream Simulation */}
-      {renderSimulatedFeed()}
+      {/* Video Content Canvas / Stream */}
+      {renderFeedContent()}
 
       {/* Tactical Scanlines Texture */}
       {showScanlines && (
@@ -183,7 +132,7 @@ export const VideoViewport: React.FC<VideoViewportProps> = ({
           className="absolute inset-0 pointer-events-none opacity-25"
           style={{
             backgroundImage:
-              'linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.4) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03))',
+              'linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.4) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 255, 0, 0.03))',
             backgroundSize: '100% 4px, 6px 100%',
           }}
         />
@@ -201,7 +150,7 @@ export const VideoViewport: React.FC<VideoViewportProps> = ({
 
       {/* PTZ / Crosshair Center Reticle */}
       {(showCrosshair || camera.ptzCapable) && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-35">
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-30">
           <svg
             className="w-24 h-24 text-[#00d1ff]"
             viewBox="0 0 100 100"
@@ -226,7 +175,9 @@ export const VideoViewport: React.FC<VideoViewportProps> = ({
           isDrawing={isDrawingTripwire}
           onTripwireCreated={onTripwireCreated}
           onTripwireSelect={onTripwireSelect}
+          onTripwireBreach={onTripwireBreach}
           selectedTripwireId={selectedTripwireId}
+          cameraId={camera.id}
           hasActiveBreach={hasActiveBreach}
         />
       ) : null}
@@ -234,7 +185,7 @@ export const VideoViewport: React.FC<VideoViewportProps> = ({
       {/* Detection & Bounding Boxes Layer */}
       {detections.length > 0 && <DetectionOverlay detections={detections} />}
 
-      {/* Custom Overlays (e.g., Active Breach Banner, Action Reticles) */}
+      {/* Custom Overlays */}
       {customOverlay}
     </div>
   );
