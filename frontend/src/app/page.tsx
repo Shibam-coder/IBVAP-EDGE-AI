@@ -25,36 +25,29 @@ export default function Home() {
           </p>
         </div>
 
-        {/* Team Scope Allocation Matrix */}
+        {/* Team Scope Allocation Matrix (Two-Person Engineering Model) */}
         <h2 className="text-sm font-bold text-[#feb700] uppercase mb-3">
           Frontend Engineering Team Scope Allocation
         </h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
           <div className="p-4 border border-[#3c494e] bg-[#0c0e12]">
-            <div className="text-xs text-[#00d1ff] font-bold">SHIBAM (Lead)</div>
-            <div className="text-xs font-semibold text-white mt-1">Core Shell & Layout</div>
+            <div className="text-xs text-[#00d1ff] font-bold">SHIBAM (Frontend Lead)</div>
+            <div className="text-xs font-semibold text-white mt-1">Shell, Threat Intel, GIS & Integration</div>
             <ul className="text-[11px] text-[#bbc9cf] mt-2 space-y-1">
-              <li>• Navigation & Shell</li>
-              <li>• Stitch Design Tokens</li>
-              <li>• System Architecture</li>
+              <li>• Screen 1: Surveillance Initialization</li>
+              <li>• Screen 4: Sector Analytics & XAI Threat Feed</li>
+              <li>• Screen 5: GIS Tactical Map Tracking</li>
+              <li>• Layout (`src/components/layout`), Threat (`src/components/threat`), GIS (`src/components/gis`), UI (`src/components/ui`)</li>
             </ul>
           </div>
           <div className="p-4 border border-[#3c494e] bg-[#0c0e12]">
-            <div className="text-xs text-[#00d1ff] font-bold">DEBANJAN</div>
-            <div className="text-xs font-semibold text-white mt-1">Video & Tripwire</div>
+            <div className="text-xs text-[#00d1ff] font-bold">DEBANJAN (Video & Interaction Lead)</div>
+            <div className="text-xs font-semibold text-white mt-1">Multi-Camera Streams & Tripwires</div>
             <ul className="text-[11px] text-[#bbc9cf] mt-2 space-y-1">
-              <li>• Stream Players & Grid</li>
-              <li>• Tripwire Overlay</li>
-              <li>• Camera Selector</li>
-            </ul>
-          </div>
-          <div className="p-4 border border-[#3c494e] bg-[#0c0e12]">
-            <div className="text-xs text-[#00d1ff] font-bold">PROTYUSH</div>
-            <div className="text-xs font-semibold text-white mt-1">Threat & GIS</div>
-            <ul className="text-[11px] text-[#bbc9cf] mt-2 space-y-1">
-              <li>• XAI Threat Feed</li>
-              <li>• Risk Gauges</li>
-              <li>• GIS Map Canvas</li>
+              <li>• Screen 2: Tactical Grid View (4-Cam Grid)</li>
+              <li>• Screen 3: Command Center Focus & Stream Player</li>
+              <li>• Video Components (`src/components/video`)</li>
+              <li>• Tripwire Overlay & Spatial Boundaries (`src/components/tripwire`)</li>
             </ul>
           </div>
         </div>
