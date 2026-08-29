@@ -1,7 +1,10 @@
 import React from 'react';
 import { XaiExplanation } from '@/types';
+import { ThreatAnalysisInput, calculateThreatScore } from './threatCalculator';
+import { generateXaiExplanation } from './xaiEngine';
 
 interface XaiExplanationCardProps {
+  input?: ThreatAnalysisInput;
   explanation?: XaiExplanation;
   threatScore?: number;
   objectType?: string;
@@ -11,13 +14,24 @@ interface XaiExplanationCardProps {
 }
 
 export const XaiExplanationCard: React.FC<XaiExplanationCardProps> = ({
-  explanation,
-  threatScore = 95,
+  input,
+  explanation: directExplanation,
+  threatScore: directThreatScore,
   objectType = 'Human',
   confidence = 0.96,
   tripwireBreached = true,
   className = '',
 }) => {
+  // If input is provided, compute dynamically
+  let computedScore = directThreatScore ?? 95;
+  let explanation = directExplanation;
+
+  if (input) {
+    const scoreResult = calculateThreatScore(input);
+    computedScore = scoreResult.score;
+    explanation = generateXaiExplanation(input, scoreResult);
+  }
+
   const defaultReasons = [
     {
       icon: 'directions_run',
@@ -59,7 +73,7 @@ export const XaiExplanationCard: React.FC<XaiExplanationCardProps> = ({
           </span>
         </div>
         <span className="font-mono text-[9px] text-[#ffb4ab] bg-[#93000a]/20 border border-[#ffb4ab]/30 px-1.5 py-0.5 uppercase">
-          Score: {threatScore}/100
+          Score: {computedScore}/100
         </span>
       </div>
 

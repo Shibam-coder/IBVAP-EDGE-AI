@@ -1,10 +1,11 @@
 import React from 'react';
+import { SeverityLevel } from '@/types';
 
 interface RiskGaugeProps {
   score: number; // 0 - 100
   title?: string;
   size?: number;
-  severity?: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
+  severity?: SeverityLevel;
   className?: string;
 }
 
@@ -24,7 +25,8 @@ export const RiskGauge: React.FC<RiskGaugeProps> = ({
     HIGH: '#ffaaa4',
     MEDIUM: '#feb700',
     LOW: '#00d1ff',
-  }[severity];
+    INFO: '#a4e6ff',
+  }[severity] || '#00d1ff';
 
   return (
     <div className={`flex flex-col items-center justify-center ${className}`}>
