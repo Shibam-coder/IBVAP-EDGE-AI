@@ -8,7 +8,7 @@ import asyncio
 import logging
 import time
 import uuid
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from ..ai.detection import to_detection_event
 from ..ai.mock_detections import get_default_mock_tripwires
