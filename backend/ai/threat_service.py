@@ -13,7 +13,7 @@ Features:
 """
 
 import uuid
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Tuple, Union
 from pydantic import BaseModel, Field
 from ..app.schemas import (
     SeverityLevel,
