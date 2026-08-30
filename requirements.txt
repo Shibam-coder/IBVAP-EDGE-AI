@@ -1,0 +1,17 @@
+# IBVAP-EDGE-AI Backend Dependencies
+# Python >= 3.10
+
+# Core Web & API Framework
+fastapi>=0.110.0
+uvicorn[standard]>=0.28.0
+pydantic>=2.6.0
+numpy>=1.24.0
+
+# Testing & Client Utilities
+httpx>=0.27.0
+pytest>=8.0.0
+
+# Optional Computer Vision & Real YOLO Inference (Install when hardware/wheel is available)
+# ultralytics>=8.0.0
+# opencv-python>=4.8.0
+# torch>=2.0.0
