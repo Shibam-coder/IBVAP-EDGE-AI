@@ -97,6 +97,61 @@ def normalize_object_type(raw_class_name: str) -> Optional[Tuple[str, DetectionC
     return CLASS_MAPPING.get(normalized_key, None)
 
 
+def decode_image_frame(frame_data: Any) -> Optional[Tuple[Any, int, int]]:
+    """
+    Decodes frame data (base64 string, bytes, or numpy array) into a BGR numpy image.
+    Returns (img_array, width, height) or None on failure.
+    """
+    if frame_data is None:
+        return None
+
+    # If already a numpy array
+    if hasattr(frame_data, "shape") and len(frame_data.shape) >= 2:
+        h, w = frame_data.shape[:2]
+        return frame_data, int(w), int(h)
+
+    import base64
+    import io
+
+    raw_bytes: Optional[bytes] = None
+    if isinstance(frame_data, str):
+        # Strip data URL prefix if present
+        if "," in frame_data and "base64" in frame_data:
+            frame_data = frame_data.split(",", 1)[1]
+        try:
+            raw_bytes = base64.b64decode(frame_data)
+        except Exception:
+            return None
+    elif isinstance(frame_data, (bytes, bytearray)):
+        raw_bytes = bytes(frame_data)
+
+    if not raw_bytes:
+        return None
+
+    try:
+        import numpy as np
+        import cv2
+        np_arr = np.frombuffer(raw_bytes, np.uint8)
+        img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+        if img is not None:
+            h, w = img.shape[:2]
+            return img, int(w), int(h)
+    except Exception:
+        pass
+
+    try:
+        from PIL import Image
+        import numpy as np
+        image = Image.open(io.BytesIO(raw_bytes)).convert("RGB")
+        w, h = image.size
+        img_np = np.array(image)[:, :, ::-1]  # Convert RGB to BGR
+        return img_np, int(w), int(h)
+    except Exception:
+        pass
+
+    return None
+
+
 def to_detection_event(det: DetectionItem) -> DetectionEvent:
     """Convert DetectionItem to canonical DetectionEvent format."""
     box = det.bbox or det.boundingBox or BoundingBox(x=0.0, y=0.0, width=0.0, height=0.0)

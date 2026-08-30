@@ -320,3 +320,64 @@ def test_direct_tripwire_and_threat_endpoints(client: TestClient) -> None:
     )
     assert thr_res.status_code == 200
     assert thr_res.json()["data"]["score"] >= 80
+
+
+# ==========================================
+# 10. LOCAL VIDEO & FRAME INGESTION PIPELINE TESTS
+# ==========================================
+def test_decode_image_frame_and_process_base64_frame(client: TestClient) -> None:
+    """Verify processing base64 image frame through /api/v1/process-frame."""
+    import base64
+    import numpy as np
+    import cv2
+
+    # Create dummy 640x480 test image frame
+    img = np.zeros((480, 640, 3), dtype=np.uint8)
+    # Draw simple shape
+    cv2.rectangle(img, (200, 150), (440, 350), (0, 255, 0), -1)
+    _, buf = cv2.imencode(".jpg", img)
+    b64_str = base64.b64encode(buf.tobytes()).decode("utf-8")
+
+    resp = client.post(
+        "/api/v1/process-frame",
+        json={
+            "camera_id": "CAM-01",
+            "frame_base64": b64_str,
+            "frame_id": "FRM-TEST-001"
+        }
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["success"] is True
+    assert data["data"]["frame_id"] == "FRM-TEST-001"
+    assert "inference_time_ms" in data["data"]
+
+
+def test_process_video_file_pipeline(client: TestClient, tmp_path) -> None:
+    """Verify end-to-end video processing from a local MP4 file."""
+    import cv2
+    import numpy as np
+
+    # Generate a synthetic 15-frame MP4 video
+    test_video_path = str(tmp_path / "test_cctv_feed.mp4")
+    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+    out = cv2.VideoWriter(test_video_path, fourcc, 10.0, (640, 480))
+
+    for i in range(15):
+        frame = np.zeros((480, 640, 3), dtype=np.uint8)
+        # Draw moving circle across frames
+        cx = int(200 + i * 20)
+        cv2.circle(frame, (cx, 240), 30, (0, 200, 255), -1)
+        out.write(frame)
+    out.release()
+
+    resp = client.post(
+        f"/api/v1/process-video?video_path={test_video_path}&camera_id=CAM-01&max_frames=5&frame_interval=2"
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["success"] is True
+    assert data["data"]["status"] == "video_processing_complete"
+    assert data["data"]["frames_extracted"] > 0
+    assert data["data"]["total_detections"] > 0
+

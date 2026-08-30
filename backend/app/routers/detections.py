@@ -65,6 +65,55 @@ async def process_frame(request: ProcessFrameRequest) -> ApiResponse[ProcessFram
 
 
 @router.post(
+    "/api/v1/process-video",
+    response_model=ApiResponse[Dict[str, Any]],
+    summary="Process CCTV / Local Video File through Pipeline"
+)
+async def process_video_endpoint(
+    video_path: Optional[str] = Query(None, description="Local path to video file (MP4, AVI)"),
+    camera_id: str = Query("CAM-01", description="Camera source identifier"),
+    max_frames: int = Query(20, ge=1, le=100, description="Max frames to extract and process"),
+    frame_interval: int = Query(5, ge=1, le=30, description="Interval between sampled frames"),
+    broadcast: bool = Query(True, description="Broadcast results to connected WebSockets"),
+) -> ApiResponse[Dict[str, Any]]:
+    """
+    Ingests and processes a real local CCTV video file:
+    Frame Extraction -> Human/Vehicle AI Detection -> Spatial Tripwire -> Threat Scoring & XAI -> Live WebSocket Broadcast
+    """
+    if not video_path:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="A valid 'video_path' query parameter or file path must be provided."
+        )
+
+    try:
+        result = await event_service.process_video_file(
+            video_path=video_path,
+            camera_id=camera_id,
+            max_frames=max_frames,
+            frame_interval=frame_interval,
+            broadcast=broadcast,
+        )
+
+        return ApiResponse(
+            success=True,
+            data=result,
+            message="Video processed and broadcast to WebSockets successfully",
+            timestamp=get_current_utc_timestamp(),
+        )
+    except FileNotFoundError as fnf:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(fnf)
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Video pipeline failure: {str(exc)}"
+        )
+
+
+@router.post(
     "/api/v1/mock/trigger",
     response_model=ApiResponse[Dict[str, Any]],
     summary="Trigger Deterministic Simulated Intrusion Scenario"
