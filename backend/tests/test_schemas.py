@@ -33,7 +33,8 @@ def test_canonical_events_generation() -> None:
     assert trip.crossed is True
     assert trip.crossing_direction == "INBOUND"
 
-    assert threat.threat_score == 88.5
+    assert 0.0 <= threat.threat_score <= 100.0
+    assert threat.threat_score == 91.0
     assert threat.severity == "CRITICAL"
     assert len(threat.xai_reasons) > 0
 

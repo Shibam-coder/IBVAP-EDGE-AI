@@ -4,7 +4,7 @@ Problem Statement ID: 26187
 """
 
 from datetime import datetime, timezone
-from typing import Any, Dict, Generic, List, Literal, Optional, TypeVar, Union
+from typing import Any, Dict, Generic, List, Literal, Optional, Tuple, TypeVar, Union
 from pydantic import BaseModel, Field
 
 
@@ -18,13 +18,19 @@ def get_current_utc_timestamp() -> str:
 # ==========================================
 SeverityLevel = Literal["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"]
 DetectionCategory = Literal["HUMAN", "VEHICLE", "ANIMAL", "DRONE", "UNKNOWN"]
-CrossingDirection = Literal["INBOUND", "OUTBOUND", "BIDIRECTIONAL"]
+CrossingDirection = Literal["INBOUND", "OUTBOUND", "BIDIRECTIONAL", "UNKNOWN"]
 
 
 class Point2D(BaseModel):
     """2D point coordinate (normalized 0..1 or pixel value)."""
     x: float
     y: float
+
+    def to_tuple(self) -> Tuple[float, float]:
+        return (self.x, self.y)
+
+
+Centroid = Point2D  # Alias for compatibility
 
 
 class BoundingBox(BaseModel):
@@ -36,7 +42,7 @@ class BoundingBox(BaseModel):
 
 
 # ==========================================
-# 2. CANONICAL DETECTION EVENT (STEP 4)
+# 2. CANONICAL DETECTION EVENT
 # ==========================================
 class DetectionEvent(BaseModel):
     """
@@ -46,18 +52,16 @@ class DetectionEvent(BaseModel):
     camera_id: str = Field(..., description="Source camera identifier")
     timestamp: str = Field(default_factory=get_current_utc_timestamp, description="ISO timestamp")
     object_id: Union[str, int] = Field(..., description="Persistent track ID or detection index")
-    object_type: Literal["human", "vehicle", "human_intruder", "vehicle_patrol", "human_authorized"] = Field(
-        ..., description="Object classification category"
-    )
+    object_type: str = Field(..., description="Object classification (e.g. human, vehicle)")
     confidence: float = Field(..., ge=0.0, le=1.0, description="Detection confidence score (0.0 - 1.0)")
     bbox: Union[BoundingBox, List[float], Dict[str, float]] = Field(
         ..., description="Bounding box representation [x, y, width, height] or {x, y, width, height}"
     )
-    centroid: Union[Point2D, List[float], tuple[float, float]] = Field(
-        ..., description="Centroid coordinate [x, y]"
+    centroid: Union[Point2D, List[float], Tuple[float, float], Dict[str, float]] = Field(
+        ..., description="Centroid coordinate [x, y] or {x, y}"
     )
     speed: Optional[float] = Field(None, ge=0.0, description="Speed in meters/sec or km/h")
-    previous_centroid: Optional[Union[Point2D, List[float], tuple[float, float]]] = Field(
+    previous_centroid: Optional[Union[Point2D, List[float], Tuple[float, float], Dict[str, float]]] = Field(
         None, description="Previous centroid coordinate for kinematic tracking"
     )
 
@@ -67,27 +71,32 @@ class DetectionEvent(BaseModel):
 # ==========================================
 class DetectionItem(BaseModel):
     """
-    Detection item schema fully compatible with Next.js frontend DetectionOverlay.tsx.
+    Detection item schema fully compatible with Next.js frontend DetectionOverlay.tsx & detectionAdapter.ts.
     """
     id: str = Field(..., description="Detection or track identifier")
     camera_id: Optional[str] = Field("CAM-01", description="Camera source")
     timestamp: str = Field(default_factory=get_current_utc_timestamp)
     confidence: float = Field(..., ge=0.0, le=1.0)
     category: DetectionCategory = Field("HUMAN", description="Standard frontend category")
-    object_type: Optional[str] = Field(None, description="Raw model type (person/vehicle/etc)")
+    object_type: Optional[str] = Field("human", description="Raw model type (person/vehicle/etc)")
     label: Optional[str] = Field(None, description="Rendered tactical HUD label")
     bbox: Optional[BoundingBox] = Field(None, description="Bounding box")
     boundingBox: Optional[BoundingBox] = Field(None, description="Alias for bbox")
     centroid: Optional[Point2D] = None
+    previous_centroid: Optional[Point2D] = None
     severity: Optional[SeverityLevel] = Field("INFO", description="Threat severity level")
     trackId: Optional[str] = Field(None, description="Tracker ID")
     speedKmH: Optional[float] = Field(None, ge=0.0, description="Speed in km/h")
     speedMps: Optional[float] = Field(None, ge=0.0, description="Speed in m/s")
+    speed: Optional[float] = Field(None, ge=0.0, description="Generic speed field")
     posture: Optional[str] = Field(None, description="STANDING / CROUCHING / CRAWLING / RUNNING / EVASIVE")
     isHostile: Optional[bool] = Field(False, description="Hostility trigger flag")
     plateNumber: Optional[str] = Field(None, description="Optional vehicle plate for UI mock")
     isBlacklisted: Optional[bool] = Field(None, description="Watchlist match")
     ocrConfidence: Optional[float] = Field(None, ge=0.0, le=1.0)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return self.model_dump()
 
 
 # ==========================================
@@ -96,7 +105,7 @@ class DetectionItem(BaseModel):
 class TripwireZone(BaseModel):
     """Spatial virtual tripwire boundary configuration."""
     id: str = Field(..., description="Tripwire zone ID")
-    cameraId: str = Field(..., description="Camera ID")
+    cameraId: str = Field("CAM-01", description="Camera ID")
     name: str = Field(..., description="Descriptive zone name")
     points: List[Point2D] = Field(..., min_length=2, description="Start and end points of tripwire")
     direction: CrossingDirection = Field("INBOUND", description="Monitored crossing direction")
@@ -111,14 +120,18 @@ class TripwireEvent(BaseModel):
     """
     id: Optional[str] = Field(None, description="Event ID")
     tripwire_id: str = Field(..., description="Breached tripwire ID")
-    camera_id: str = Field(..., description="Camera identifier")
+    camera_id: str = Field("CAM-01", description="Camera identifier")
     object_id: Union[str, int] = Field(..., description="Track ID of the crossing object")
     crossed: bool = Field(True, description="Whether line was intersected")
     crossing_direction: str = Field("INBOUND", description="Observed direction of crossing")
     timestamp: str = Field(default_factory=get_current_utc_timestamp)
-    targetClass: Optional[DetectionCategory] = Field("HUMAN", description="Target classification")
+    targetClass: Optional[str] = Field("HUMAN", description="Target classification")
     confidence: Optional[float] = Field(1.0, ge=0.0, le=1.0)
     snapshotUrl: Optional[str] = None
+    tripwire_breached: Optional[bool] = Field(True, description="Frontend boolean alias")
+
+
+TripwireBreachEvent = TripwireEvent  # Alias
 
 
 # ==========================================
@@ -146,7 +159,7 @@ class ThreatEvent(BaseModel):
     Canonical Threat Event generated by the threat evaluation engine.
     """
     event_id: str = Field(..., description="Unique threat alert identifier")
-    camera_id: str = Field(..., description="Camera source identifier")
+    camera_id: str = Field("CAM-01", description="Camera source identifier")
     object_type: str = Field("human", description="Object type (human or vehicle)")
     threat_score: float = Field(..., ge=0.0, le=100.0, description="Risk score 0 to 100")
     severity: SeverityLevel = Field("CRITICAL", description="Severity level")
@@ -162,7 +175,7 @@ class ThreatAlert(BaseModel):
     timestamp: str = Field(default_factory=get_current_utc_timestamp)
     incidentCode: str = Field("INC-26187", description="Tactical incident code")
     title: str = Field("Perimeter Intrusion Alert", description="Alert title")
-    cameraId: str
+    cameraId: str = "CAM-01"
     cameraName: str = Field("Sector-04 Perimeter Alpha")
     severity: SeverityLevel = "CRITICAL"
     riskScore: float = Field(..., ge=0.0, le=100.0)
@@ -172,11 +185,11 @@ class ThreatAlert(BaseModel):
 
 
 # ==========================================
-# 6. WEBSOCKET ENVELOPES (STEP 5 & FRONTEND)
+# 6. WEBSOCKET ENVELOPES
 # ==========================================
 class EventEnvelope(BaseModel):
     """
-    Canonical JSON event envelope (Step 5):
+    Canonical JSON event envelope:
     {
       "type": "detection" | "tripwire" | "threat",
       "timestamp": "...",
@@ -226,6 +239,8 @@ class ApiResponse(BaseModel, Generic[T]):
 class ProcessFrameRequest(BaseModel):
     """API payload for frame / video inspection."""
     camera_id: str = Field("CAM-01", description="Camera source identifier")
+    scenario: Optional[str] = Field(None, description="Optional simulation scenario name")
+    step: Optional[int] = Field(0, description="Scenario step (0, 1, 2)")
     frame_id: Optional[str] = Field(None, description="Optional client frame sequence ID")
     frame_base64: Optional[str] = Field(None, description="Optional raw frame data (base64)")
     tripwires: Optional[List[TripwireZone]] = Field(None, description="Active tripwires for evaluation")
@@ -243,10 +258,12 @@ class ProcessFrameResponseData(BaseModel):
 
 
 class HealthResponse(BaseModel):
-    """Canonical Health check response (Step 3)."""
+    """Canonical Health check response."""
     status: str = "ok"
     service: str = "IBVAP-EDGE-AI"
     mode: str = "local"
+    yolo_loaded: bool = False
+    timestamp: str = Field(default_factory=get_current_utc_timestamp)
 
 
 class TelemetrySummary(BaseModel):

@@ -18,6 +18,8 @@ from ..app.schemas import (
     XaiFactor,
     get_current_utc_timestamp,
 )
+from .detection import MockDetectionAdapter, to_detection_event
+from .threat_service import ThreatAnalysisInput, calculate_threat_score, to_threat_models
 
 
 def generate_mock_detection_sequence() -> Tuple[List[DetectionItem], List[TripwireEvent], List[ThreatAlert]]:
@@ -29,123 +31,85 @@ def generate_mock_detection_sequence() -> Tuple[List[DetectionItem], List[Tripwi
     """
     ts = get_current_utc_timestamp()
     cam_id = "CAM-01"
-    track_id = "TRK-101"
+    track_id = "HUMAN-TRK-101"
 
-    # 1. Human Detection Item
-    human_bbox = BoundingBox(x=0.42, y=0.48, width=0.12, height=0.28)
-    human_centroid = Point2D(x=0.48, y=0.62)
-    human_prev_centroid = Point2D(x=0.48, y=0.35)
-
-    detection_item = DetectionItem(
-        id=f"DET-{uuid.uuid4().hex[:8].upper()}",
-        camera_id=cam_id,
-        timestamp=ts,
-        confidence=0.94,
-        category="HUMAN",
-        object_type="human",
-        label="HUMAN #101",
-        bbox=human_bbox,
-        boundingBox=human_bbox,
-        centroid=human_centroid,
-        severity="CRITICAL",
-        trackId=track_id,
-        speedMps=3.4,
-        speedKmH=12.2,
-        posture="RUNNING",
-        isHostile=True
-    )
+    # 1. Detection items
+    detection_items = [
+        MockDetectionAdapter.create_detection(
+            object_type="person",
+            confidence=0.94,
+            x=0.42,
+            y=0.48,
+            width=0.12,
+            height=0.28,
+            object_id=track_id,
+            camera_id=cam_id,
+            speedKmH=12.2,
+            posture="RUNNING",
+            previous_centroid=Point2D(x=0.48, y=0.35),
+            is_hostile=True,
+        )
+    ]
 
     # 2. Tripwire Breach Event
-    tripwire_event = TripwireEvent(
-        id=f"TWE-{uuid.uuid4().hex[:8].upper()}",
-        tripwire_id="TW-ALPHA-01",
-        camera_id=cam_id,
-        object_id=track_id,
-        crossed=True,
-        crossing_direction="INBOUND",
-        timestamp=ts,
-        targetClass="HUMAN",
-        confidence=0.96
-    )
+    tripwire_events = [
+        TripwireEvent(
+            id=f"TWE-{uuid.uuid4().hex[:8].upper()}",
+            tripwire_id="TW-ALPHA-01",
+            camera_id=cam_id,
+            object_id=track_id,
+            crossed=True,
+            crossing_direction="INBOUND",
+            timestamp=ts,
+            targetClass="HUMAN",
+            confidence=0.96,
+            tripwire_breached=True,
+        )
+    ]
 
-    # 3. XAI Threat Explanation & Alert
-    xai_explanation = XaiExplanation(
-        classConfidence=0.94,
+    # 3. Threat Alert with XAI Explanation
+    analysis_input = ThreatAnalysisInput(
+        objectType="HUMAN",
+        confidence=0.94,
+        tripwireBreached=True,
+        crossingDirection="INBOUND",
         speedMps=3.4,
-        kinematicProfile="ACCELERATING_INBOUND",
-        trajectoryDescription="Direct perpendicular approach vector to Sector-04 perimeter",
-        reasons=[
-            "Target crossed virtual perimeter tripwire TW-ALPHA-01 inbound",
-            "Elevated approach velocity (3.4 m/s) towards restricted zone",
-            "Anomalous running posture identified in high-security sector"
-        ],
-        factors=[
-            XaiFactor(name="Tripwire Breach", weight=0.45, description="Active perimeter line crossing"),
-            XaiFactor(name="Kinematic Velocity", weight=0.30, description="Abnormal approach velocity"),
-            XaiFactor(name="Posture & Trajectory", weight=0.25, description="Hostile posture pattern")
-        ]
-    )
-
-    threat_alert = ThreatAlert(
-        id=f"ALT-{uuid.uuid4().hex[:8].upper()}",
-        timestamp=ts,
-        incidentCode="INC-26187",
-        title="High-Threat Perimeter Breach Detected",
+        speedKmH=12.2,
+        isRestrictedZone=True,
+        posture="RUNNING",
+        zoneName="Sector-04 Perimeter Alpha",
+        tripwireName="TW-ALPHA-01",
         cameraId=cam_id,
-        cameraName="Sector-04 Perimeter Alpha",
-        severity="CRITICAL",
-        riskScore=88.5,
-        threat_score=88.5,
-        aiExplanation=xai_explanation,
-        status="OPEN"
+        objectId=track_id,
     )
+    _, threat_alert = to_threat_models(analysis_input)
 
-    return [detection_item], [tripwire_event], [threat_alert]
+    return detection_items, tripwire_events, [threat_alert]
 
 
 def generate_canonical_events() -> Tuple[DetectionEvent, TripwireEvent, ThreatEvent]:
     """
-    Generate canonical Step 4 Pydantic event models for unit testing and schema compliance.
+    Generate canonical Pydantic event models for unit testing and schema compliance.
     """
-    ts = get_current_utc_timestamp()
-    cam_id = "CAM-01"
-    obj_id = "obj_101"
+    det_items, trip_events, _ = generate_mock_detection_sequence()
+    det_event = to_detection_event(det_items[0])
+    det_event.event_id = f"EVT-DET-{uuid.uuid4().hex[:6]}"
+    trip_event = trip_events[0]
 
-    det_event = DetectionEvent(
-        event_id=f"EVT-DET-{uuid.uuid4().hex[:6]}",
-        camera_id=cam_id,
-        timestamp=ts,
-        object_id=obj_id,
-        object_type="human",
+    analysis_input = ThreatAnalysisInput(
+        objectType="HUMAN",
         confidence=0.94,
-        bbox=[0.42, 0.48, 0.12, 0.28],
-        centroid=[0.48, 0.62],
-        speed=3.4,
-        previous_centroid=[0.48, 0.35]
+        tripwireBreached=True,
+        crossingDirection="INBOUND",
+        speedMps=3.4,
+        isRestrictedZone=True,
+        posture="RUNNING",
+        zoneName="Sector-04 Perimeter Alpha",
+        tripwireName="TW-ALPHA-01",
+        cameraId="CAM-01",
+        objectId=det_event.object_id,
     )
-
-    trip_event = TripwireEvent(
-        tripwire_id="TW-ALPHA-01",
-        camera_id=cam_id,
-        object_id=obj_id,
-        crossed=True,
-        crossing_direction="INBOUND",
-        timestamp=ts
-    )
-
-    threat_event = ThreatEvent(
-        event_id=f"EVT-THR-{uuid.uuid4().hex[:6]}",
-        camera_id=cam_id,
-        object_type="human",
-        threat_score=88.5,
-        severity="CRITICAL",
-        xai_reasons=[
-            "Perimeter tripwire breach detected on TW-ALPHA-01",
-            "High approach velocity (3.4 m/s)",
-            "Target identified in restricted perimeter zone"
-        ],
-        timestamp=ts
-    )
+    threat_event, _ = to_threat_models(analysis_input)
 
     return det_event, trip_event, threat_event
 
