@@ -9,6 +9,7 @@ import { DetectionItem } from './DetectionOverlay';
 export interface CameraGridProps {
   cameras?: CameraFeed[];
   tripwires?: TripwireZone[];
+  detections?: Record<string, DetectionItem[]>;
   activeAlertCameraId?: string;
   selectedCameraId?: string | null;
   onSelectCamera?: (camera: CameraFeed) => void;
@@ -85,6 +86,7 @@ const DEFAULT_GRID_DETECTIONS: Record<string, DetectionItem[]> = {
 export const CameraGrid: React.FC<CameraGridProps> = ({
   cameras = MOCK_CAMERA_FEEDS,
   tripwires = MOCK_TRIPWIRES,
+  detections,
   activeAlertCameraId = 'CAM-01',
   selectedCameraId,
   onSelectCamera,
@@ -95,7 +97,10 @@ export const CameraGrid: React.FC<CameraGridProps> = ({
       className={`grid grid-cols-1 md:grid-cols-2 gap-1 bg-[#3c494e] p-[1px] h-full overflow-hidden ${className}`}
     >
       {cameras.slice(0, 4).map((camera) => {
-        const camDetections = DEFAULT_GRID_DETECTIONS[camera.id] || [];
+        const camDetections =
+          (detections && detections[camera.id]) ||
+          DEFAULT_GRID_DETECTIONS[camera.id] ||
+          [];
         const camTripwires = tripwires.filter((tw) => tw.cameraId === camera.id);
         const hasAlert = camera.id === activeAlertCameraId;
         const isSelected = camera.id === selectedCameraId;

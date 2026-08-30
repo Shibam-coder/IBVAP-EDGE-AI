@@ -6,18 +6,26 @@ import { TripwireZone, Point2D, TripwireDirection, SeverityLevel } from '@/types
 /**
  * Structured Tripwire Breach Event contract.
  * Exposes clean, typed parameters ready for downstream XAI and Threat Score engines.
+ * Supports both snake_case and camelCase attributes for complete backend/frontend contract interoperability.
  */
 export interface TripwireBreachEvent {
   tripwire_id: string;
+  tripwireId?: string;
   tripwire_name?: string;
+  tripwireName?: string;
   camera_id: string;
+  cameraId?: string;
   timestamp: string;
   object_type: string;
+  targetClass?: string;
   confidence: number;
   crossing_direction: 'INBOUND' | 'OUTBOUND';
+  crossingDirection?: 'INBOUND' | 'OUTBOUND';
   tripwire_breached: boolean;
+  tripwireBreached?: boolean;
   coordinates?: Point2D[];
   snapshot_url?: string;
+  snapshotUrl?: string;
 }
 
 export interface SpatialTripwireOverlayProps {

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { CameraFeed, TripwireZone, TripwireDirection, SeverityLevel } from '@/types';
 import { MOCK_CAMERA_FEEDS, MOCK_TRIPWIRES } from '@/data/mockData';
 import { VideoFocusStage } from './VideoFocusStage';
@@ -13,6 +13,7 @@ import { EvidenceHashFooter } from './EvidenceHashFooter';
 import { TripwireControls } from '../tripwire/TripwireControls';
 import { TripwireBreachEvent } from '../tripwire/SpatialTripwireOverlay';
 import { VisionFiltersState } from './VideoViewport';
+import { useVideoTelemetry } from '@/hooks/useVideoTelemetry';
 
 export interface CommandCenterFocusViewProps {
   initialCamera?: CameraFeed;
@@ -42,8 +43,29 @@ export const CommandCenterFocusView: React.FC<CommandCenterFocusViewProps> = ({
   const [drawSeverity, setDrawSeverity] = useState<SeverityLevel>('CRITICAL');
   const [selectedTripwireId, setSelectedTripwireId] = useState<string | null>(null);
 
+  // Live telemetry integration with fallback to mock demonstration
+  const {
+    activeFocusDetections,
+    getCameraDetections,
+    isLive,
+    hasActiveBreach: isLiveBreach,
+    latestBreachEvent,
+  } = useVideoTelemetry({
+    cameraId: selectedCamera.id,
+  });
+
   // Mock Breach Demonstration State (Toggle between NORMAL and BREACH state for UI testing)
   const [isDemoBreachActive, setIsDemoBreachActive] = useState<boolean>(true);
+
+  // Sync latest live breach event to prop callback if provided
+  useEffect(() => {
+    if (latestBreachEvent && onTripwireBreach) {
+      onTripwireBreach(latestBreachEvent);
+    }
+  }, [latestBreachEvent, onTripwireBreach]);
+
+  const effectiveBreachActive = isLive ? isLiveBreach : isDemoBreachActive;
+  const currentCameraDetections = isLive ? getCameraDetections(selectedCamera.id) : activeFocusDetections;
 
   const [filters, setFilters] = useState<VisionFiltersState>({
     deHaze: true,
@@ -292,13 +314,14 @@ export const CommandCenterFocusView: React.FC<CommandCenterFocusViewProps> = ({
             <VideoFocusStage
               camera={selectedCamera}
               tripwires={tripwires}
+              detections={currentCameraDetections}
               isDrawingTripwire={isDrawingTripwire}
               onTripwireCreated={handleTripwireCreated}
               onTripwireSelect={setSelectedTripwireId}
               onTripwireBreach={onTripwireBreach}
               selectedTripwireId={selectedTripwireId}
               filters={filters}
-              hasActiveBreach={isDemoBreachActive}
+              hasActiveBreach={effectiveBreachActive}
               onDispatchUnit={() => alert('DISPATCH RAPID RESPONSE TEAM INITIATED')}
               onSoundAlarm={() => alert('TACTICAL PERIMETER ALARM SOUNDED')}
             />
@@ -326,20 +349,20 @@ export const CommandCenterFocusView: React.FC<CommandCenterFocusViewProps> = ({
                     cy="50"
                     r="45"
                     fill="none"
-                    stroke={isDemoBreachActive ? '#ffb4ab' : '#00d1ff'}
+                    stroke={effectiveBreachActive ? '#ffb4ab' : '#00d1ff'}
                     strokeWidth="6"
                     strokeDasharray="283"
-                    strokeDashoffset={isDemoBreachActive ? '14' : '220'}
+                    strokeDashoffset={effectiveBreachActive ? '14' : '220'}
                     className="shadow-[0_0_15px_rgba(255,180,171,0.8)] transition-all duration-500"
                   />
                 </svg>
                 <div className="text-center z-10">
                   <div
                     className={`font-sans text-3xl font-bold leading-none ${
-                      isDemoBreachActive ? 'text-[#ffb4ab]' : 'text-[#00d1ff]'
+                      effectiveBreachActive ? 'text-[#ffb4ab]' : 'text-[#00d1ff]'
                     }`}
                   >
-                    {isDemoBreachActive ? '95' : '18'}
+                    {effectiveBreachActive ? '95' : '18'}
                   </div>
                   <div className="font-mono text-[10px] text-[#859399] mt-1">/100</div>
                 </div>

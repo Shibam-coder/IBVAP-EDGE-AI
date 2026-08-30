@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { CameraFeed, TripwireZone, ThreatAlert } from '@/types';
 import { MOCK_CAMERA_FEEDS, MOCK_TRIPWIRES, MOCK_THREAT_ALERTS } from '@/data/mockData';
 import { CameraGrid } from './CameraGrid';
+import { useVideoTelemetry } from '@/hooks/useVideoTelemetry';
 
 export interface TacticalGridViewProps {
   cameras?: CameraFeed[];
@@ -27,6 +28,7 @@ export const TacticalGridView: React.FC<TacticalGridViewProps> = ({
   className = '',
 }) => {
   const [activeAlertCamId] = useState<string>('CAM-01');
+  const { gridDetections, isLive } = useVideoTelemetry();
 
   return (
     <div className={`flex h-screen w-screen bg-[#111318] text-[#e2e2e8] overflow-hidden select-none font-sans ${className}`}>
@@ -176,8 +178,8 @@ export const TacticalGridView: React.FC<TacticalGridViewProps> = ({
                 RESTRICTED
               </span>
               <span className="px-3 py-1 font-mono text-[11px] font-bold border border-[#a4e6ff] text-[#a4e6ff] bg-[#a4e6ff]/10 flex items-center gap-1.5 rounded-xs">
-                <span className="w-2 h-2 rounded-full bg-[#a4e6ff] animate-pulse" />
-                ND-01
+                <span className={`w-2 h-2 rounded-full ${isLive ? 'bg-[#00d1ff]' : 'bg-[#a4e6ff]'} animate-pulse`} />
+                {isLive ? 'LIVE MESH' : 'ND-01'}
               </span>
             </div>
             <div className="font-mono text-sm text-[#bbc9cf]">
@@ -205,6 +207,7 @@ export const TacticalGridView: React.FC<TacticalGridViewProps> = ({
             <CameraGrid
               cameras={cameras}
               tripwires={tripwires}
+              detections={gridDetections}
               activeAlertCameraId={activeAlertCamId}
               onSelectCamera={onSelectCamera}
             />

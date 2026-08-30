@@ -9,27 +9,40 @@ import { BoundingBox, DetectionCategory, SeverityLevel } from '@/types';
  */
 export interface DetectionItem {
   id?: string;
+  camera_id?: string;
+  cameraId?: string;
+  timestamp?: string;
   object_type?: 'person' | 'vehicle' | 'human' | 'animal' | 'drone' | string;
+  class_name?: string;
   category?: DetectionCategory;
   label?: string;
   confidence: number;
-  /** Normalized (0..1) or pixel bounding box coordinates */
-  bbox?: {
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-  };
-  boundingBox?: BoundingBox;
+  /** Normalized (0..1) or pixel bounding box coordinates (object or [x,y,w,h]) */
+  bbox?:
+    | {
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+      }
+    | [number, number, number, number];
+  boundingBox?: BoundingBox | [number, number, number, number];
   severity?: SeverityLevel;
   trackId?: string;
+  track_id?: string | number;
   speedKmH?: number;
+  speed_kmh?: number;
   speedMps?: number;
+  speed_mps?: number;
   posture?: 'STANDING' | 'CROUCHING' | 'CRAWLING' | 'RUNNING' | 'EVASIVE' | string;
   isHostile?: boolean;
+  is_hostile?: boolean;
   plateNumber?: string;
+  plate_number?: string;
   isBlacklisted?: boolean;
+  is_blacklisted?: boolean;
   ocrConfidence?: number;
+  ocr_confidence?: number;
 }
 
 export interface DetectionOverlayProps {
@@ -48,9 +61,30 @@ export const DetectionOverlay: React.FC<DetectionOverlayProps> = ({
   return (
     <div className={`absolute inset-0 pointer-events-none ${className}`}>
       {detections.map((det, index) => {
-        // Resolve bounding box coordinates from either bbox or boundingBox
-        const box = det.bbox || det.boundingBox || { x: 0, y: 0, width: 0, height: 0 };
+        // Resolve bounding box coordinates from either bbox (object/array) or boundingBox
+        const rawBox = det.bbox || det.boundingBox;
+        let box = { x: 0, y: 0, width: 0, height: 0 };
+
+        if (Array.isArray(rawBox) && rawBox.length >= 4) {
+          box = { x: rawBox[0], y: rawBox[1], width: rawBox[2], height: rawBox[3] };
+        } else if (rawBox && typeof rawBox === 'object' && !Array.isArray(rawBox)) {
+          const obj = rawBox as { x?: number; y?: number; width?: number; height?: number };
+          box = {
+            x: typeof obj.x === 'number' ? obj.x : 0,
+            y: typeof obj.y === 'number' ? obj.y : 0,
+            width: typeof obj.width === 'number' ? obj.width : 0,
+            height: typeof obj.height === 'number' ? obj.height : 0,
+          };
+        }
+
         const id = det.id || `det-${index}`;
+        const trackId = det.trackId || (det.track_id !== undefined ? String(det.track_id) : undefined);
+        const speedKmH = det.speedKmH ?? det.speed_kmh;
+        const speedMps = det.speedMps ?? det.speed_mps;
+        const isHostile = det.isHostile || det.is_hostile || det.severity === 'CRITICAL';
+        const isBlacklisted = det.isBlacklisted || det.is_blacklisted || det.severity === 'HIGH';
+        const plateNumber = det.plateNumber || det.plate_number;
+        const ocrConfidence = det.ocrConfidence ?? det.ocr_confidence;
 
         // Determine if coordinates are normalized (0..1) or pixel values
         const leftPercent = box.x <= 1 && box.x >= 0 ? `${box.x * 100}%` : `${box.x}px`;
@@ -59,11 +93,10 @@ export const DetectionOverlay: React.FC<DetectionOverlayProps> = ({
         const heightPercent = box.height <= 1 && box.height > 0 ? `${box.height * 100}%` : `${box.height}px`;
 
         // Normalize object type
-        const rawType = (det.object_type || det.category || 'UNKNOWN').toUpperCase();
+        const rawType = (det.object_type || det.class_name || det.category || 'UNKNOWN').toUpperCase();
         const isPerson = rawType === 'PERSON' || rawType === 'HUMAN';
-        const isVehicle = rawType === 'VEHICLE' || rawType === 'CAR' || rawType === 'TRUCK';
-        const isHostile = det.isHostile || det.severity === 'CRITICAL';
-        const isBlacklisted = det.isBlacklisted || det.severity === 'HIGH';
+        const isVehicle = rawType === 'VEHICLE' || rawType === 'CAR' || rawType === 'TRUCK' || rawType === 'SUV';
+
 
         // Styling based on Stitch theme
         const borderColor = isHostile
@@ -94,9 +127,9 @@ export const DetectionOverlay: React.FC<DetectionOverlayProps> = ({
         const displayLabel =
           det.label ||
           (isPerson
-            ? `HUMAN #${det.trackId || id.slice(-3).toUpperCase()}`
+            ? `HUMAN #${trackId || id.slice(-3).toUpperCase()}`
             : isVehicle
-            ? `VEHICLE [${det.plateNumber ? 'ANPR LOCK' : 'DETECTED'}]`
+            ? `VEHICLE [${plateNumber ? 'ANPR LOCK' : 'DETECTED'}]`
             : rawType);
 
         return (
@@ -128,38 +161,38 @@ export const DetectionOverlay: React.FC<DetectionOverlayProps> = ({
                     {(det.confidence * 100).toFixed(0)}%
                   </span>
                 )}
-                {det.trackId && <span className="opacity-80">[{det.trackId}]</span>}
+                {trackId && <span className="opacity-80">[{trackId}]</span>}
               </div>
             )}
 
             {/* Bottom Telemetry Tag (Speed / Posture / Hostility) */}
-            {(det.speedKmH !== undefined || det.speedMps !== undefined || det.posture || isHostile) && (
+            {(speedKmH !== undefined || speedMps !== undefined || det.posture || isHostile) && (
               <div
                 className={`absolute -bottom-4 right-0 px-1 py-0.2 bg-[#0c0e12]/95 border border-[#3c494e] font-mono text-[8px] font-bold ${textColor} whitespace-nowrap`}
               >
                 {isHostile && <span className="text-[#ffb4ab] mr-1">HOSTILE</span>}
-                {det.speedKmH !== undefined ? (
-                  <span>{det.speedKmH} KM/H</span>
-                ) : det.speedMps !== undefined ? (
-                  <span>{det.speedMps} m/s</span>
+                {speedKmH !== undefined ? (
+                  <span>{speedKmH} KM/H</span>
+                ) : speedMps !== undefined ? (
+                  <span>{speedMps} m/s</span>
                 ) : null}
                 {det.posture && <span className="ml-1 opacity-80 uppercase">({det.posture})</span>}
               </div>
             )}
 
             {/* ANPR Dedicated Lock Overlay if vehicle license plate is present */}
-            {det.plateNumber && (
+            {plateNumber && (
               <div className="absolute inset-0 flex flex-col items-center justify-center p-1 bg-black/50">
                 <div className="border border-[#feb700] bg-[#feb700]/10 p-1.5 text-center backdrop-blur-xs shadow-lg">
                   <div className="font-mono text-[7px] text-[#feb700] font-bold tracking-widest uppercase">
                     ANPR LOCK DETECTED
                   </div>
                   <div className="bg-[#feb700] text-[#412d00] font-mono font-bold text-xs px-2 py-0.5 mt-0.5 tracking-widest">
-                    {det.plateNumber}
+                    {plateNumber}
                   </div>
                   <div className="flex justify-between gap-2 font-mono text-[8px] text-[#feb700] mt-0.5 bg-black/70 px-1">
-                    <span>{det.isBlacklisted ? 'BLACKLIST MATCH' : 'REGISTERED'}</span>
-                    <span>OCR {det.ocrConfidence ? (det.ocrConfidence * 100).toFixed(1) : '96.2'}%</span>
+                    <span>{isBlacklisted ? 'BLACKLIST MATCH' : 'REGISTERED'}</span>
+                    <span>OCR {ocrConfidence ? (ocrConfidence * 100).toFixed(1) : '96.2'}%</span>
                   </div>
                 </div>
               </div>

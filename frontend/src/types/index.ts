@@ -244,3 +244,60 @@ export interface WebSocketMessage<T = unknown> {
   payload: T;
   timestamp: string;
 }
+
+export interface BackendRawDetection {
+  id?: string;
+  camera_id?: string;
+  cameraId?: string;
+  timestamp?: string;
+  class_name?: string;
+  object_type?: string;
+  category?: DetectionCategory | string;
+  label?: string;
+  confidence: number;
+  bbox?: { x: number; y: number; width: number; height: number } | [number, number, number, number];
+  boundingBox?: BoundingBox | [number, number, number, number];
+  track_id?: string | number;
+  trackId?: string;
+  speed_kmh?: number;
+  speedKmH?: number;
+  speed_mps?: number;
+  speedMps?: number;
+  posture?: 'STANDING' | 'CROUCHING' | 'CRAWLING' | 'RUNNING' | 'EVASIVE' | string;
+  is_hostile?: boolean;
+  isHostile?: boolean;
+  weapon_detected?: boolean;
+  weaponDetected?: boolean;
+  license_plate?: string;
+  plateNumber?: string;
+  is_blacklisted?: boolean;
+  isBlacklisted?: boolean;
+  ocr_confidence?: number;
+  ocrConfidence?: number;
+}
+
+export interface DetectionFramePayload {
+  cameraId: string;
+  camera_id?: string;
+  timestamp: string;
+  fps?: number;
+  detections: BackendRawDetection[];
+}
+
+export interface TripwireBreachPayload {
+  tripwire_id: string;
+  tripwireId?: string;
+  tripwire_name?: string;
+  camera_id: string;
+  cameraId?: string;
+  timestamp: string;
+  object_type: string;
+  targetClass?: DetectionCategory;
+  confidence: number;
+  crossing_direction: 'INBOUND' | 'OUTBOUND';
+  crossingDirection?: 'INBOUND' | 'OUTBOUND';
+  tripwire_breached: boolean;
+  coordinates?: Point2D[];
+  snapshot_url?: string;
+}
+
